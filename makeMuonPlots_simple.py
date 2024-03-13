@@ -11,18 +11,18 @@ fnames = glob.glob("/data/fmeloni/DataMuC_MuColl10_v0A/reco/muonGun_pT_0_50/*.sl
 
 # Set up histograms
 hists = {}
-hists["pfo_pt"] = ROOT.TH1F("pfo_pt", "pfo_pt", 100, 0, 2000)
-hists["muon_pt"] = ROOT.TH1F("muon_pt", "muon_pt", 100, 0, 2000)
+hists["pfo_pt"] = ROOT.TH1F("pfo_pt", "pfo_pt", 100, 0, 100)
+hists["muon_pt"] = ROOT.TH1F("muon_pt", "muon_pt", 100, 0, 100)
 
 # Loop over events
 i = 0
-for f in fnames:
+for i_fname, f in enumerate(fnames):
     reader = pyLCIO.IOIMPL.LCFactory.getInstance().createLCReader()
     reader.open(f)
 
     for event in reader:
         if max_events > 0 and i >= max_events: break
-        if i%100 == 0: print("Processing event %i."%i)
+        if i%1000 == 0: print(f"Processing event {i}, file {i_fname}/{len(fnames)}")
 
         # Get the collections we care about
         mcpCollection = event.getCollection("MCParticle")
@@ -43,4 +43,4 @@ for f in fnames:
 for i, h in enumerate(hists):
     c = ROOT.TCanvas("c%i"%i, "c%i"%i)
     hists[h].Draw()
-    c.SaveAs("%s.png"%h)
+    c.SaveAs("%s.pdf"%h)
