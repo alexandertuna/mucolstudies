@@ -18,13 +18,14 @@ def main():
     # Read LCIO into pandas
     pqname = 'makeMuonPlots_industrial.parquet'
     pkname = 'makeMuonPlots_industrial.pickle'
-    if False and os.path.exists(pqname):
+    if os.path.exists(pqname):
         df = pd.read_parquet(pqname)
     else:
         df = processFiles(fnames)
         postProcess(df)
         print(df)
         print('Writing to file ...')
+        # pip install pyarrow
         df.to_parquet(pqname)
         df.to_pickle(pkname)
 
@@ -76,15 +77,16 @@ def processEvent(event):
         pfo_p = pfo.getMomentum()
         df.at[row, 'px'] = pfo_p[0]
         df.at[row, 'py'] = pfo_p[1]
+        df.at[row, 'pz'] = pfo_p[2]
         df.at[row, 'type'] = pfo.getType()
         df.at[row, 'ismuon'] = isMuon(pfo.getType())
     return df
 
 def createDataframe(n_rows):
     return pd.DataFrame({
-        # 'pt':     np.zeros(n_rows, dtype=float),
         'px':     np.zeros(n_rows, dtype=float),
         'py':     np.zeros(n_rows, dtype=float),
+        'pz':     np.zeros(n_rows, dtype=float),
         'type':   np.zeros(n_rows, dtype=int),
         'ismuon': np.zeros(n_rows, dtype=bool),
     })
