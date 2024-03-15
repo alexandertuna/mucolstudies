@@ -1,6 +1,8 @@
 import pyLCIO # type: ignore
 import glob
+import itertools
 import math
+import multiprocessing as mp
 import os
 
 import numpy as np
@@ -9,7 +11,7 @@ import matplotlib as mpl # type: ignore
 mpl.use('Agg')
 import matplotlib.pyplot as plt # type: ignore
 
-from typing import List
+from typing import List, Iterator
 
 def main() -> None:
     filepath = "/data/fmeloni/DataMuC_MuColl10_v0A/reco/muonGun_pT_0_50/*.slcio"
@@ -56,15 +58,25 @@ def postProcess(df: pd.DataFrame) -> None:
 
 
 def processFiles(fnames: List[str]) -> pd.DataFrame:
-    n_rows = 0
+    n_workers = 5
+    list_of_dfs = []
+    with mp.Pool(n_workers) as pool:
+        list_of_dfs = pool.map(processFilesSerially, chunkify(fnames, n_workers))
+    return pd.concat(itertools.chain.from_iterable(list_of_dfs), ignore_index=True)
+
+
+def chunkify(fnames: List[str], nchunks: int) -> Iterator[List[str]]:
+    for chunk in range(nchunks):
+        yield fnames[chunk::nchunks]
+
+
+def processFilesSerially(fnames: List[str]) -> List[pd.DataFrame]:
     dfs = []
     for i_fname, f in enumerate(fnames):
         if i_fname % 100 == 0:
             print(f"Processing file {i_fname}/{len(fnames)}")
         dfs.append( processFile(f) )
-        # if i_fname > 40:
-        #     break
-    return pd.concat(dfs, ignore_index=True)
+    return dfs
 
 
 def processFile(fname: str) -> pd.DataFrame:
@@ -74,7 +86,6 @@ def processFile(fname: str) -> pd.DataFrame:
 
 
 def processEvents(reader) -> pd.DataFrame:
-    n_rows = 0
     dfs = []
     for i_event, event in enumerate(reader):
         dfs.append( processEvent(event) )
