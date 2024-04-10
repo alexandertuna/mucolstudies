@@ -34,6 +34,7 @@ class names:
     ecal_endcap = 'EcalEndcapCollectionRec'
     hcal_barrel = 'HcalBarrelsCollectionRec'
     hcal_endcap = 'HcalEndcapsCollectionRec'
+    yoke = 'MUON'
 
 class systems:
     ecal_barrel = 20
@@ -54,6 +55,8 @@ class CaloHitChecker:
 
     def __init__(self, fnames: List[str]) -> None:
         self.fnames = fnames
+        self.collection_names = [getattr(names, attr) for attr in
+                                 filter(lambda attr: not attr.startswith('_'), dir(names))]
 
 
     def readHits(self) -> None:
@@ -70,6 +73,7 @@ class CaloHitChecker:
         print(f'Processing {fname} ...')
         reader = pyLCIO.IOIMPL.LCFactory.getInstance().createLCReader()
         reader.open(fname)
+        reader.setReadCollectionNames(self.collection_names)
         return [self.processEventCellView(event) for event in reader]
 
 
@@ -79,6 +83,7 @@ class CaloHitChecker:
         if names.clusters not in event.getCollectionNames():
             return df
         col = event.getCollection(names.clusters)
+        total = {'ecal': 0, 'hcal': 0, 'yoke': 0}
         for i_clus, clus in enumerate(col):
             for i_hit, hit in enumerate(clus.getCalorimeterHits()):
                 cellid = int(hit.getCellID0() & 0xffffffff) | (int( hit.getCellID1() ) << 32)
@@ -89,9 +94,10 @@ class CaloHitChecker:
                 yoke = system in systems.yoke
                 if not (ecal ^ hcal) and not yoke:
                     raise Exception(f'Hit must be ecal ({ecal}) xor hcal ({hcal})')
-                df.at[0, 'ecal'] += ecal
-                df.at[0, 'hcal'] += hcal
-                df.at[0, 'yoke'] += yoke
+                total['ecal'] += ecal
+                total['hcal'] += hcal
+                total['yoke'] += yoke
+        df.loc[0] = total
         return df
 
 
