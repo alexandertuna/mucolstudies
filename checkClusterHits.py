@@ -3,8 +3,9 @@ from pyLCIO import EVENT, UTIL
 
 import itertools
 import multiprocessing as mp
+import os
 import numpy as np
-import pandas as pd # type: ignore
+import pandas as pd
 
 from typing import Any, List
 from dataclasses import dataclass
@@ -13,16 +14,16 @@ encoding = 'system:0:5,side:5:-2,module:7:8,stave:15:4,layer:19:9,submodule:28:4
 
 def main():
     fnames = [
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4200.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4210.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4220.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4230.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4240.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4250.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4260.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4270.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4280.slcio',
-        '/data/fmeloni/DataMuC_MuColl10_v0A/reco/pionGun_pT_250_1000/pionGun_pT_250_1000_reco_4290.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10000.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10100.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10200.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10300.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10400.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10500.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10600.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10700.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10800.slcio',
+        '/data/fmeloni/DataMuC_MuColl10_v0A/v1/reco/neutronGun_E_250_1000/neutronGun_E_250_1000_reco_10900.slcio',
     ]
     checker = CaloHitChecker(fnames)
     checker.readHits()
@@ -32,8 +33,8 @@ class names:
     clusters = 'PandoraClusters'
     ecal_barrel = 'EcalBarrelCollectionRec'
     ecal_endcap = 'EcalEndcapCollectionRec'
-    hcal_barrel = 'HcalBarrelsCollectionRec'
-    hcal_endcap = 'HcalEndcapsCollectionRec'
+    hcal_barrel = 'HcalBarrelCollectionRec'
+    hcal_endcap = 'HcalEndcapCollectionRec'
     yoke = 'MUON'
 
 class systems:
@@ -65,8 +66,8 @@ class CaloHitChecker:
             list_of_dfs = pool.map(self.readHitsSerially, self.fnames)
             print('Merging ...')
             df = self.mergeDataFrames(list_of_dfs)
-        print('Total:\n', df)
-        print('Total:\n', df.sum())
+        print(f'Total:\n{df}')
+        print(f'Total:\n{df.sum()}')
 
 
     def readHitsSerially(self, fname: str) -> List[pd.DataFrame]:
@@ -83,7 +84,7 @@ class CaloHitChecker:
         if names.clusters not in event.getCollectionNames():
             return df
         col = event.getCollection(names.clusters)
-        total = {'ecal': 0, 'hcal': 0, 'yoke': 0}
+        total = {'ecal hits-on-cluster': 0, 'hcal hits-on-cluster': 0, 'yoke hits-on-cluster': 0}
         for i_clus, clus in enumerate(col):
             for i_hit, hit in enumerate(clus.getCalorimeterHits()):
                 cellid = int(hit.getCellID0() & 0xffffffff) | (int( hit.getCellID1() ) << 32)
@@ -94,9 +95,9 @@ class CaloHitChecker:
                 yoke = system in systems.yoke
                 if not (ecal ^ hcal) and not yoke:
                     raise Exception(f'Hit must be ecal ({ecal}) xor hcal ({hcal})')
-                total['ecal'] += ecal
-                total['hcal'] += hcal
-                total['yoke'] += yoke
+                total['ecal hits-on-cluster'] += ecal
+                total['hcal hits-on-cluster'] += hcal
+                total['yoke hits-on-cluster'] += yoke
         df.loc[0] = total
         return df
 
@@ -121,9 +122,9 @@ class CaloHitChecker:
 
     def initDataFrame(self, rows: int) -> pd.DataFrame:
         return pd.DataFrame({
-            'ecal': np.zeros(rows, dtype=int),
-            'hcal': np.zeros(rows, dtype=int),
-            'yoke': np.zeros(rows, dtype=int),
+            'ecal hits-on-cluster': np.zeros(rows, dtype=int),
+            'hcal hits-on-cluster': np.zeros(rows, dtype=int),
+            'yoke hits-on-cluster': np.zeros(rows, dtype=int),
         })
 
 if __name__ == '__main__':
